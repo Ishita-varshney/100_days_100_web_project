@@ -1,24 +1,243 @@
+
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" , content="width=device-width, initial-scale=1.0" />
-    <title>Flappy Bird using Javascript || Web Addicted</title>
-    <link rel="icon" href="../favv.png" type="image/x-icon" />
-    <style>
-      body {
-        font-family: "Courier New", Courier, monospace;
-        text-align: center;
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flappy Bird Game</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      background: black;
+      font-family: Arial, sans-serif;
+    }
+
+    #board {
+      background-image: url("./flappybirdbg.png");
+      background-size: cover;
+      background-position: center;
+      border: 2px solid white;
+
+      width: 100vw;
+      height: 100vh;
+      max-width: 400px;
+      max-height: 700px;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="board"></canvas>
+
+  <script>
+    // Board Setup
+    let board;
+    let context;
+
+    let boardWidth = 400;
+    let boardHeight = 700;
+
+    // Bird
+    let birdWidth = 34;
+    let birdHeight = 24;
+    let birdX = boardWidth / 8;
+    let birdY = boardHeight / 2;
+
+    let birdImg;
+
+    let bird = {
+      x: birdX,
+      y: birdY,
+      width: birdWidth,
+      height: birdHeight
+    };
+
+    // Pipes
+    let pipeArray = [];
+
+    let pipeWidth = 64;
+    let pipeHeight = 512;
+    let pipeX = boardWidth;
+    let pipeY = 0;
+
+    let topPipeImg;
+    let bottomPipeImg;
+
+    // Physics
+    let velocityX = -2;
+    let velocityY = 0;
+    let gravity = 0.4;
+
+    let gameOver = false;
+    let score = 0;
+
+    window.onload = function () {
+      board = document.getElementById("board");
+      board.width = boardWidth;
+      board.height = boardHeight;
+
+      context = board.getContext("2d");
+
+      // Bird Image
+      birdImg = new Image();
+      birdImg.src = "./flappybird.png";
+
+      birdImg.onload = function () {
+        context.drawImage(
+          birdImg,
+          bird.x,
+          bird.y,
+          bird.width,
+          bird.height
+        );
+      };
+
+      // Pipe Images
+      topPipeImg = new Image();
+      topPipeImg.src = "./toppipe.png";
+
+      bottomPipeImg = new Image();
+      bottomPipeImg.src = "./bottompipe.png";
+
+      requestAnimationFrame(update);
+      setInterval(placePipes, 1500);
+
+      document.addEventListener("keydown", moveBird);
+    };
+
+    function update() {
+      requestAnimationFrame(update);
+
+      if (gameOver) {
+        return;
       }
 
-      #board {
-        /* background-color: skyblue; */
-        background-image: url("./flappybirdbg.png");
+      context.clearRect(0, 0, board.width, board.height);
+
+      // Bird Movement
+      velocityY += gravity;
+      bird.y = Math.max(bird.y + velocityY, 0);
+
+      context.drawImage(
+        birdImg,
+        bird.x,
+        bird.y,
+        bird.width,
+        bird.height
+      );
+
+      if (bird.y > board.height) {
+        gameOver = true;
       }
-    </style>
-  </head>
-  <body>
-    <canvas id="board"></canvas>
-    <script src="flappybird.js"></script>
-  </body>
+
+      // Pipes
+      for (let i = 0; i < pipeArray.length; i++) {
+        let pipe = pipeArray[i];
+
+        pipe.x += velocityX;
+
+        context.drawImage(
+          pipe.img,
+          pipe.x,
+          pipe.y,
+          pipe.width,
+          pipe.height
+        );
+
+        if (!pipe.passed && bird.x > pipe.x + pipe.width) {
+          score += 0.5;
+          pipe.passed = true;
+        }
+
+        if (detectCollision(bird, pipe)) {
+          gameOver = true;
+        }
+      }
+
+      // Remove Pipes
+      while (pipeArray.length > 0 && pipeArray[0].x < -pipeWidth) {
+        pipeArray.shift();
+      }
+
+      // Score
+      context.fillStyle = "white";
+      context.font = "35px Arial";
+      context.fillText(score, 20, 45);
+
+      // Game Over
+      if (gameOver) {
+        context.fillText("GAME OVER", 80, 320);
+      }
+    }
+
+    function placePipes() {
+      if (gameOver) {
+        return;
+      }
+
+      let randomPipeY =
+        pipeY - pipeHeight / 4 - Math.random() * (pipeHeight / 2);
+
+      let openingSpace = board.height / 4;
+
+      let topPipe = {
+        img: topPipeImg,
+        x: pipeX,
+        y: randomPipeY,
+        width: pipeWidth,
+        height: pipeHeight,
+        passed: false
+      };
+
+      pipeArray.push(topPipe);
+
+      let bottomPipe = {
+        img: bottomPipeImg,
+        x: pipeX,
+        y: randomPipeY + pipeHeight + openingSpace,
+        width: pipeWidth,
+        height: pipeHeight,
+        passed: false
+      };
+
+      pipeArray.push(bottomPipe);
+    }
+
+    function moveBird(e) {
+      if (e.code == "Space" || e.code == "ArrowUp") {
+        velocityY = -6;
+
+        // Restart Game
+        if (gameOver) {
+          bird.y = birdY;
+          pipeArray = [];
+          score = 0;
+          gameOver = false;
+        }
+      }
+    }
+
+    function detectCollision(a, b) {
+      return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+      );
+    }
+  </script>
+</body>
 </html>
+
